@@ -1,18 +1,26 @@
-# This is a sample Python script.
+import pygame
+import math
+import random
+import time
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+pygame.init()
+
+WIDTH, HEIGHT = 800, 600
+
+WIN = pygame.display.set_mode((WIDTH, HEIGHT)) #initialize a pygame window
+pygame.display.set_caption("Aim Trainer")
+
+#create the main program loop
+def main():
+    run = True
+    while run:
+        for event in pygame.event.get(): #loop through all events occurring
+            if event.type == pygame.QUIT:
+                run = False
+                break # this lets you actually click the x button and close the app
+
+    pygame.quit()
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
-
-    print('testing')
-
-
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+if __name__ == "__main__":
+    main()
