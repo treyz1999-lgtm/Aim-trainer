@@ -20,8 +20,21 @@ BG_COLOR = pygame.Color(0,25,40) #this might be adjustable by the user in the fu
 class Target:
     MAX_SIZE = 30 #this is how large the target can grow to - will likely make this adjustable via a slider or something in the future
     GROWTH_RATE = 0.2 #how fast the target grows - again we can use sliders in a future update
-    COLOR1 = "blue" #what color we want it to be
+    COLOR1 = "red" #what color we want it to be
     COLOR2 = "white"
+    OUTLINE = "black"
+    RINGS = (
+        (OUTLINE, 1.0),
+        (COLOR1, 0.90),
+        (OUTLINE, 0.85),
+        (COLOR2, 0.80),
+        (OUTLINE, 0.75),
+        (COLOR1, 0.60),
+        (OUTLINE, 0.55),
+        (COLOR2, 0.40),
+        (OUTLINE, 0.35),
+        (COLOR2, 0.30),
+    )
 
     def __init__(self, x, y): #x,y are the positions to place the target
         self.x = x
@@ -39,11 +52,13 @@ class Target:
             self.size -= self.GROWTH_RATE
 
     def draw(self, win):
-        #we need to draw layered circles if we want like the commonly used target pattern
-        pygame.draw.circle(win, self.COLOR1, (self.x, self.y), self.size)
-        pygame.draw.circle(win, self.COLOR2, (self.x, self.y), self.size * 0.8)
-        pygame.draw.circle(win, self.COLOR1, (self.x, self.y), self.size * 0.6)
-        pygame.draw.circle(win, self.COLOR2, (self.x, self.y), self.size * 0.4)
+        #Draw from largest to smallest so each black ring becomes an outline between sections.
+        for color, scale in self.RINGS:
+            pygame.draw.circle(win, color, (self.x, self.y), self.size * scale)
+
+    def collide(self, x, y):
+       dis = math.sqrt( (self.x - x)**2 + (self.y - y)**2)
+       return dis <= self.size
 
 #create the main program loop
 def draw(win, targets):
@@ -55,13 +70,26 @@ def draw(win, targets):
 
     pygame.display.update()
 
+
+
+
 def main():
     run = True
     targets = [] #store all the target objects
+    clock = pygame.time.Clock() #fixed frame rate
+
+    target_hits = 0
+    clicks = 0
+    misses = 0
+    start_time = time.time()
 
     pygame.time.set_timer(TARGET_EVENT, TARGET_INCREMENT) #trigger the event every x ms
 
     while run:
+        clock.tick(60)
+        click = False #if the user clicks we set this to true
+        mouse_pos = pygame.mouse.get_pos()
+
         for event in pygame.event.get(): #loop through all events occurring
             if event.type == pygame.QUIT:
                 run = False
@@ -73,9 +101,21 @@ def main():
                 target = Target(x, y)  #new target object
                 targets.append(target)
 
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                click = True
+                clicks +=1
+
         #update targets before you draw them
         for target in targets:
             target.update()
+
+            if target.size <= 0:
+                targets.remove(target) #clean up for performance
+                misses += 1
+
+            if click and target.collide(*mouse_pos):
+                targets.remove(target)
+                target_hits += 1
 
         draw(WIN, targets)
 
