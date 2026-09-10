@@ -1,5 +1,6 @@
 import pygame
 import math
+import os
 import random
 import time
 
@@ -22,7 +23,12 @@ SMALL_FONT = pygame.font.SysFont("Arial", 14, bold= True)
 GAME_OVER_FONT = pygame.font.SysFont("Arial", 48, bold= True)
 
 SETTINGS_BUTTON = pygame.Rect(WIDTH - 95, 10, 85, 30)
-SETTINGS_PANEL = pygame.Rect(180, 85, 440, 430)
+SETTINGS_PANEL = pygame.Rect(180, 75, 440, 500)
+MUSIC_PATH = os.path.join("assets", "audio", "background.mp3")
+HIT_SOUND_DIR = os.path.join("assets", "audio", "hits")
+HIT_MARKER_PATH = os.path.join("assets", "images", "Hitmarker.png")
+HIT_MARKER_DURATION = 0.2
+HIT_MARKER_SIZE = 38
 COLOR_OPTIONS = [
     ("Red", "red"),
     ("White", "white"),
@@ -53,6 +59,8 @@ def get_default_settings():
         "spawn_rate": TARGET_INCREMENT,
         "target_size": 30,
         "lives": 10,
+        "music_volume": 30,
+        "hit_volume": 70,
     }
 
 #make a Target class that will have all the behavior and functionality for the onscreen targets
@@ -95,13 +103,76 @@ class Target:
        dis = math.sqrt( (self.x - x)**2 + (self.y - y)**2)
        return dis <= self.size
 
+
+class HitMarker:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.start_time = time.time()
+
+    def is_expired(self):
+        return time.time() - self.start_time >= HIT_MARKER_DURATION
+
+    def draw(self, win, image):
+        if image is None:
+            return
+
+        progress = (time.time() - self.start_time) / HIT_MARKER_DURATION
+        alpha = max(0, 255 - int(255 * progress))
+        marker = image.copy()
+        marker.set_alpha(alpha)
+        x = self.x - marker.get_width() // 2
+        y = self.y - marker.get_height() // 2
+        win.blit(marker, (x, y))
+
+
+def load_game_assets():
+    assets = {
+        "hit_marker": None,
+        "hit_sounds": [],
+        "music_loaded": False,
+    }
+
+    if os.path.exists(HIT_MARKER_PATH):
+        marker = pygame.image.load(HIT_MARKER_PATH).convert_alpha()
+        assets["hit_marker"] = pygame.transform.smoothscale(
+            marker,
+            (HIT_MARKER_SIZE, HIT_MARKER_SIZE),
+        )
+
+    if os.path.isdir(HIT_SOUND_DIR):
+        for file_name in os.listdir(HIT_SOUND_DIR):
+            if file_name.lower().endswith((".wav", ".ogg", ".mp3")):
+                sound_path = os.path.join(HIT_SOUND_DIR, file_name)
+                assets["hit_sounds"].append(pygame.mixer.Sound(sound_path))
+
+    if os.path.exists(MUSIC_PATH):
+        pygame.mixer.music.load(MUSIC_PATH)
+        assets["music_loaded"] = True
+
+    return assets
+
+
+def apply_audio_settings(settings, assets):
+    music_volume = settings["music_volume"] / 100
+    hit_volume = settings["hit_volume"] / 100
+
+    if assets["music_loaded"]:
+        pygame.mixer.music.set_volume(music_volume)
+
+    for sound in assets["hit_sounds"]:
+        sound.set_volume(hit_volume)
+
 #create the main program loop
-def draw(win, targets, settings):
+def draw(win, targets, hit_markers, settings, assets):
     #you need to clear the screen then draw the objects on it and update the display, and we do this every frame - frame by frame rendering
     win.fill(settings["background"])
 
     for target in targets:
         target.draw(win, settings)
+
+    for hit_marker in hit_markers:
+        hit_marker.draw(win, assets["hit_marker"])
 
 
 
@@ -141,7 +212,7 @@ def draw_info_bar(win, elapsed_time, target_hits, misses, settings, settings_ope
 
 
 def draw_game_over(win, elapsed_time, target_hits, misses, settings, settings_open):
-    draw(win, [], settings)
+    draw(win, [], [], settings, {"hit_marker": None})
     draw_info_bar(win, elapsed_time, target_hits, misses, settings, settings_open)
 
     game_over_label = GAME_OVER_FONT.render('Game Over', True, 'white')
@@ -160,6 +231,7 @@ def draw_game_over(win, elapsed_time, target_hits, misses, settings, settings_op
 def reset_game():
     return {
         "targets": [],
+        "hit_markers": [],
         "target_hits": 0,
         "clicks": 0,
         "misses": 0,
@@ -220,6 +292,8 @@ def get_slider_controls():
         ("spawn_rate", "Spawn Rate", 100, 2000, 50, "ms", pygame.Rect(390, 380, 160, 8)),
         ("target_size", "Target Size", 10, 80, 1, "px", pygame.Rect(390, 420, 160, 8)),
         ("lives", "Lives", 1, 20, 1, "", pygame.Rect(390, 460, 160, 8)),
+        ("music_volume", "Music Volume", 0, 100, 5, "%", pygame.Rect(390, 500, 160, 8)),
+        ("hit_volume", "Hit Volume", 0, 100, 5, "%", pygame.Rect(390, 540, 160, 8)),
     ]
 
 
@@ -292,10 +366,14 @@ def main():
     run = True
     clock = pygame.time.Clock() #fixed frame rate
     settings = get_default_settings()
+    assets = load_game_assets()
+    apply_audio_settings(settings, assets)
     game_state = reset_game()
     settings_open = False
 
     set_spawn_timer(settings) #trigger the event every x ms
+    if assets["music_loaded"]:
+        pygame.mixer.music.play(-1)
 
     while run:
         clock.tick(60)
@@ -318,6 +396,7 @@ def main():
                 if SETTINGS_BUTTON.collidepoint(event.pos):
                     settings_open = not settings_open
                     if settings_open:
+                        game_state = reset_game()
                         pause_game(game_state)
                     else:
                         resume_game(game_state, settings)
@@ -326,6 +405,7 @@ def main():
                 if settings_open:
                     settings_changed = handle_settings_event(event, settings)
                     if settings_changed:
+                        apply_audio_settings(settings, assets)
                         game_state = reset_game()
                         pause_game(game_state)
                     continue
@@ -336,6 +416,7 @@ def main():
             if settings_open and event.type == pygame.MOUSEMOTION:
                 settings_changed = handle_settings_event(event, settings)
                 if settings_changed:
+                    apply_audio_settings(settings, assets)
                     game_state = reset_game()
                     pause_game(game_state)
 
@@ -366,6 +447,13 @@ def main():
                 if click and target.collide(*mouse_pos):
                     game_state["targets"].remove(target)
                     game_state["target_hits"] += 1
+                    game_state["hit_markers"].append(HitMarker(target.x, target.y))
+                    if assets["hit_sounds"]:
+                        random.choice(assets["hit_sounds"]).play()
+
+        for hit_marker in game_state["hit_markers"][:]:
+            if hit_marker.is_expired():
+                game_state["hit_markers"].remove(hit_marker)
 
         if game_state["misses"] >= settings["lives"] and not game_state["game_over"]:
             game_state["game_over"] = True
@@ -374,7 +462,7 @@ def main():
             pygame.time.set_timer(TARGET_EVENT, 0)
 
         if settings_open:
-            draw(WIN, [], settings)
+            draw(WIN, [], [], settings, assets)
             draw_info_bar(
                 WIN,
                 elapsed_time,
@@ -395,7 +483,7 @@ def main():
                 settings_open,
             )
         else:
-            draw(WIN, game_state["targets"], settings)
+            draw(WIN, game_state["targets"], game_state["hit_markers"], settings, assets)
             draw_info_bar(
                 WIN,
                 elapsed_time,
