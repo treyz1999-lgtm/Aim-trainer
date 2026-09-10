@@ -18,10 +18,13 @@ A desktop aim trainer built with Python and Pygame. Targets spawn over time, shr
 
 ## Requirements
 
-- Python 3.14 or newer
+- Python 3.14 or newer, OR
+- Docker / Docker Desktop
 - `pygame-ce`
 
 ## Setup
+
+### Option 1: Local Python Setup
 
 Clone the repository:
 
@@ -47,6 +50,53 @@ Run the game:
 ```powershell
 .\.venv\Scripts\python.exe main.py
 ```
+
+### Option 2: Docker Setup
+
+#### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running
+
+#### Build the Image
+
+```bash
+git clone https://github.com/treyz1999-lgtm/Aim-trainer.git
+cd Aim-trainer
+docker build -t aim-trainer:latest .
+```
+
+#### Run with Docker Compose (Recommended)
+
+```bash
+docker compose up
+```
+
+To run in the background:
+
+```bash
+docker compose up -d
+```
+
+To stop the container:
+
+```bash
+docker compose down
+```
+
+#### Run with Docker CLI
+
+```bash
+docker run --rm -it \
+  -e DISPLAY=:0 \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  aim-trainer:latest
+```
+
+**Note on Display:** The default Docker setup uses `SDL_VIDEODRIVER=dummy` for headless operation. To display the game GUI:
+
+- **Linux:** Pass your `DISPLAY` variable and X11 socket as shown above
+- **macOS:** Install [XQuartz](https://www.xquartz.org/) and configure X11 forwarding
+- **Windows:** Use WSL2 with a display server like [VcXsrv](https://sourceforge.net/projects/vcxsrv/) or [Xming](http://www.straightrunning.com/XmingNotes/)
 
 ## Controls
 
